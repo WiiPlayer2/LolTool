@@ -17,6 +17,7 @@ namespace LoLTool
     class MainApp
     {
         private static RiotApi riotApi;
+        private static StaticRiotApi staticRiotApi;
 
         public static RiotApi Api
         {
@@ -31,6 +32,22 @@ namespace LoLTool
                     riotApi = RiotApi.GetInstance(Settings.Default.ApiKey);
                 }
                 return riotApi;
+            }
+        }
+
+        public static StaticRiotApi StaticApi
+        {
+            get
+            {
+                if (staticRiotApi != null)
+                {
+                    return staticRiotApi;
+                }
+                if (!string.IsNullOrWhiteSpace(Settings.Default.ApiKey))
+                {
+                    staticRiotApi = StaticRiotApi.GetInstance(Settings.Default.ApiKey);
+                }
+                return staticRiotApi;
             }
         }
 
@@ -88,21 +105,10 @@ namespace LoLTool
             [Description("The .wav to be played or empty for default")]
             string sound)
         {
-            RiotSharp.SummonerEndpoint.Summoner summoner;
-            try
+            var summoner = Helper.TryApi(() => Api.GetSummoner(Settings.Default.Region, username), checkRate);
+            if (summoner == null)
             {
-                summoner = Api.GetSummoner(Settings.Default.Region, username);
-            }
-            catch (RiotSharpException e)
-            {
-                if (e.Message.StartsWith("404,"))
-                {
-                    Console.WriteLine("No such summoner found.");
-                }
-                else
-                {
-                    Console.WriteLine("Unknown error: {0}", e.Message);
-                }
+                Console.WriteLine("No such summoner found.");
                 return;
             }
 
@@ -153,21 +159,10 @@ namespace LoLTool
             [Description("The check rate per second"), DefaultValue(5), MoreThan(0)]
             int checkRate)
         {
-            RiotSharp.SummonerEndpoint.Summoner summoner;
-            try
+            var summoner = Helper.TryApi(() => Api.GetSummoner(Settings.Default.Region, username), checkRate);
+            if (summoner == null)
             {
-                summoner = Api.GetSummoner(Settings.Default.Region, username);
-            }
-            catch (RiotSharpException e)
-            {
-                if (e.Message.StartsWith("404,"))
-                {
-                    Console.WriteLine("No such summoner found.");
-                }
-                else
-                {
-                    Console.WriteLine("Unknown error: {0}", e.Message);
-                }
+                Console.WriteLine("No such summoner found.");
                 return;
             }
 
@@ -223,6 +218,45 @@ namespace LoLTool
             Thread.Sleep((int)diff.TotalMilliseconds);
             Console.WriteLine("5 Minutes have passed. Finish up your wave!");
             Helper.PlaySound(sound, "LoLTool.ChimeSound.wav");
+        }
+
+        [Verb(Description = "Checks the winning or losing streak for every summoner in the game of the given summoner")]
+        public static void StreakCheck(
+            [Description("The summoner of which the game should be waited for")]
+            string username,
+            [Description("Shows only enemy summoners")]
+            bool enemyOnly)
+        {
+            var summoner = Helper.TryApi(() => Api.GetSummoner(Settings.Default.Region, username));
+            if (summoner == null)
+            {
+                Console.WriteLine("No such summoner found.");
+                return;
+            }
+
+            var game = Helper.TryApi(() => Api.GetCurrentGame(Platform, summoner.Id));
+            if (game == null)
+            {
+                Console.WriteLine("No game found.");
+                return;
+            }
+
+            var ownTeam = game.Participants
+                .Single(o => o.SummonerId == summoner.Id).TeamId;
+            foreach (var p in game.Participants
+                .Where(o => !o.Bot))
+            {
+                if (!enemyOnly || ownTeam != p.TeamId)
+                {
+                    var champ = Helper.TryApi(() => StaticApi.GetChampion(Settings.Default.Region, (int)p.ChampionId));
+                    var recents = Helper.TryApi(() => Api.GetRecentGames(Settings.Default.Region, p.SummonerId), maxRetries: -1);
+                    var recentWins = recents.Select(o => o.Statistics.Win);
+                    var isWinningStreak = recentWins.FirstOrDefault();
+                    var streakCount = recentWins.TakeWhile(o => o == isWinningStreak).Count();
+                    Console.WriteLine("{0,-20} ({1,-15}) is on a {2} streak with {3,2} games",
+                        p.SummonerName, champ.Name, isWinningStreak ? "winning" : "losing ", streakCount);
+                }
+            }
         }
 
         [Error]
