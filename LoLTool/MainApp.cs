@@ -157,6 +157,48 @@ namespace LoLTool
             sndPlayer.PlaySync();
         }
 
+        [Verb(Description = "Waits until the given summoner has started a game")]
+        public static void Wait(
+            [Description("The summoner of which the game should be waited for")]
+            string username,
+            [Description("The check rate per second"), DefaultValue(5), MoreThan(0)]
+            int checkRate)
+        {
+            RiotSharp.SummonerEndpoint.Summoner summoner;
+            try
+            {
+                summoner = Api.GetSummoner(Settings.Default.Region, username);
+            }
+            catch (RiotSharpException e)
+            {
+                if (e.Message.StartsWith("404,"))
+                {
+                    Console.WriteLine("No such summoner found.");
+                }
+                else
+                {
+                    Console.WriteLine("Unknown error: {0}", e.Message);
+                }
+                return;
+            }
+
+
+            RiotSharp.CurrentGameEndpoint.CurrentGame game = null;
+            do
+            {
+                try
+                {
+                    game = Api.GetCurrentGame(Platform, summoner.Id);
+                }
+                catch (RiotSharpException)
+                {
+                    Thread.Sleep(1000 * checkRate);
+                }
+            }
+            while (game == null);
+            Console.WriteLine("Game found.");
+        }
+
         [Error]
         public static void HandleError(ExceptionContext context)
         {
