@@ -143,18 +143,7 @@ namespace LoLTool
             }
 
             Console.WriteLine("Game finished.");
-
-            SoundPlayer sndPlayer;
-            if (string.IsNullOrWhiteSpace(sound))
-            {
-                sndPlayer = new SoundPlayer(
-                    Assembly.GetExecutingAssembly().GetManifestResourceStream("LoLTool.ChimeSound.wav"));
-            }
-            else
-            {
-                sndPlayer = new SoundPlayer(Path.GetFullPath(sound));
-            }
-            sndPlayer.PlaySync();
+            Helper.PlaySound(sound, "LoLTool.ChimeSound.wav");
         }
 
         [Verb(Description = "Waits until the given summoner has started a game")]
@@ -197,6 +186,43 @@ namespace LoLTool
             }
             while (game == null);
             Console.WriteLine("Game found.");
+        }
+
+        [Verb(Description = "Waits until the given summoner has started a custom game and plays a sound after 5 minutes")]
+        public static void CSTrainer(
+            [Description("The summoner of which the game should be waited for")]
+            string username,
+            [Description("The check rate per second"), DefaultValue(5), MoreThan(0)]
+            int checkRate,
+            [Description("The .wav to be played or empty for default")]
+            string sound)
+        {
+            var summoner = Helper.TryApi(() => Api.GetSummoner(Settings.Default.Region, username), checkRate);
+            if (summoner == null)
+            {
+                Console.WriteLine("No such summoner found.");
+                return;
+            }
+
+            Console.WriteLine("Waiting for custom game...");
+            RiotSharp.CurrentGameEndpoint.CurrentGame game = null;
+            while (game == null
+                || game.GameType != GameType.CustomGame
+                || game.GameStartTime.Year < 2000)
+            {
+                game = Helper.TryApi(() => Api.GetCurrentGame(Platform, summoner.Id), checkRate);
+                Thread.Sleep(1000 * checkRate);
+            }
+
+            var localTime = game.GameStartTime.ToLocalTime();
+            var targetTime = localTime.AddMinutes(5).AddSeconds(5);
+            Console.WriteLine("Game found. Started at {0}", localTime);
+            Console.WriteLine("Waiting until {0}...", targetTime);
+
+            var diff = targetTime - DateTime.Now;
+            Thread.Sleep((int)diff.TotalMilliseconds);
+            Console.WriteLine("5 Minutes have passed. Finish up your wave!");
+            Helper.PlaySound(sound, "LoLTool.ChimeSound.wav");
         }
 
         [Error]
