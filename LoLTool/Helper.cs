@@ -1,4 +1,6 @@
 ﻿using RiotSharp;
+using RiotSharp.CurrentGameEndpoint;
+using RiotSharp.SummonerEndpoint;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -13,7 +15,7 @@ namespace LoLTool
 {
     static class Helper
     {
-        public static T TryApi<T>(Func<T> apiCall, int checkRate = 5, int maxRetries = 5)
+        public static T TryApi<T>(Func<T> apiCall, int checkRate = 1, int maxRetries = -1)
         {
             for (var i = 0; i != maxRetries; i++)
             {
@@ -36,6 +38,20 @@ namespace LoLTool
             }
             return default(T);
         }
+
+        #region API Try Functions
+        public static Summoner TryGetSummoner(this RiotApi api, Region region, string summonerName,
+            int checkRate = 1, int maxRetries = -1)
+        {
+            return TryApi(() => api.GetSummoner(region, summonerName), checkRate, maxRetries);
+        }
+
+        public static CurrentGame TryGetCurrentGame(this RiotApi api, Platform platform, long summonerId,
+            int checkRate = 1, int maxRetries = -1)
+        {
+            return TryApi(() => api.GetCurrentGame(platform, summonerId), checkRate, maxRetries);
+        }
+        #endregion
 
         public static void PlaySound(string soundFile, string defaultResource)
         {

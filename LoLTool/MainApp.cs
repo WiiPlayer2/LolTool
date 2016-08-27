@@ -105,47 +105,39 @@ namespace LoLTool
             [Description("The .wav to be played or empty for default")]
             string sound)
         {
-            var summoner = Helper.TryApi(() => Api.GetSummoner(Settings.Default.Region, username), checkRate);
+            var summoner = Api.TryGetSummoner(Settings.Default.Region, username, checkRate);
             if (summoner == null)
             {
                 Console.WriteLine("No such summoner found.");
                 return;
             }
 
-            RiotSharp.CurrentGameEndpoint.CurrentGame game = null;
-            try
-            {
-                game = Api.GetCurrentGame(Platform, summoner.Id);
-                Console.WriteLine("Mode:      {0}", game.GameMode);
-                Console.WriteLine("QueueType: {0}", game.GameQueueType);
-                Console.WriteLine("GameType:  {0}", game.GameType);
-                Console.WriteLine("StartTime: {0}", game.GameStartTime.ToLocalTime());
-                Console.WriteLine();
-            }
-            catch (RiotSharpException)
+            var game = Api.TryGetCurrentGame(Platform, summoner.Id, checkRate);
+            if (game == null)
             {
                 Console.WriteLine("No game found.");
                 return;
             }
 
+            while (game.GameStartTime.Year < 2000)
+            {
+                Thread.Sleep(1000 * checkRate);
+                game = Api.TryGetCurrentGame(Platform, summoner.Id, checkRate);
+            }
+
+            Console.WriteLine("Mode:      {0}", game.GameMode);
+            Console.WriteLine("QueueType: {0}", game.GameQueueType);
+            Console.WriteLine("GameType:  {0}", game.GameType);
+            Console.WriteLine("StartTime: {0}", game.GameStartTime.ToLocalTime());
+
             var top = Console.CursorTop;
             while (game != null)
             {
-                try
-                {
-                    game = Api.GetCurrentGame(Platform, summoner.Id);
-
-                    Console.CursorTop = top;
-                    Console.WriteLine("Game is running for {0}", TimeSpan.FromSeconds(game.GameLength));
-                }
-                catch (RiotSharpException e)
-                {
-                    if (e.Message.StartsWith("404,"))
-                    {
-                        game = null;
-                    }
-                }
+                Console.CursorTop = top;
+                Console.WriteLine("Game is running for {0} ", TimeSpan.FromSeconds(game.GameLength));
                 Thread.Sleep(1000 * checkRate);
+
+                game = Api.TryGetCurrentGame(Platform, summoner.Id);
             }
 
             Console.WriteLine("Game finished.");
