@@ -4,6 +4,7 @@ using LoLTool.Properties;
 using RiotSharp;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Media;
@@ -240,8 +241,8 @@ namespace LoLTool
             {
                 if (!enemyOnly || ownTeam != p.TeamId)
                 {
-                    var champ = Helper.TryApi(() => StaticApi.GetChampion(Settings.Default.Region, (int)p.ChampionId));
-                    var recents = Helper.TryApi(() => Api.GetRecentGames(Settings.Default.Region, p.SummonerId), maxRetries: -1);
+                    var champ = Helper.TryApi(() => StaticApi.GetChampion(Settings.Default.Region, (int)p.ChampionId), 2);
+                    var recents = Helper.TryApi(() => Api.GetRecentGames(Settings.Default.Region, p.SummonerId), 2);
                     var recentWins = recents.Select(o => o.Statistics.Win);
                     var isWinningStreak = recentWins.FirstOrDefault();
                     var streakCount = recentWins.TakeWhile(o => o == isWinningStreak).Count();
@@ -249,6 +250,62 @@ namespace LoLTool
                         p.SummonerName, champ.Name, isWinningStreak ? "winning" : "losing ", streakCount);
                 }
             }
+        }
+
+        private static string GetSpectatorArgument(RiotSharp.CurrentGameEndpoint.CurrentGame game)
+        {
+            var endpoint = "";
+            switch (Settings.Default.Region)
+            {
+                case Region.euw:
+                    endpoint = "spectator.euw1.lol.riotgames.com:80";
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+
+            return $"\"spectator {endpoint} {game.Observers.EncryptionKey} {game.GameId} {Platform}\"";
+        }
+
+        [Verb(Description = "Spectates the given summoner")]
+        public static void Spectate(
+            [Description("The summoner of which the game should be spectated")]
+            string username,
+            [DefaultValue(@"C:\Riot Games")]
+            string lolDirectory)
+        {
+            var summoner = Api.TryGetSummoner(Settings.Default.Region, username);
+            if (summoner == null)
+            {
+                Console.WriteLine("No such summoner found.");
+                return;
+            }
+
+            var game = Api.TryGetCurrentGame(Platform, summoner.Id);
+            if (game == null)
+            {
+                Console.WriteLine("No game found.");
+                return;
+            }
+
+            var folder = Path.Combine(lolDirectory, "League of Legends", "RADS", "solutions", "lol_game_client_sln", "releases");
+            if (!Directory.Exists(folder))
+            {
+                Console.WriteLine("League of Legends not found at \"{0}\"", lolDirectory);
+                return;
+            }
+
+            var versionFolder = Directory.EnumerateDirectories(folder).FirstOrDefault();
+            if (versionFolder == null)
+            {
+                Console.WriteLine("League of Legends game client not found.");
+                return;
+            }
+
+            var exeFile = Path.Combine(versionFolder, "deploy", "League of Legends.exe");
+            Environment.CurrentDirectory = Path.GetDirectoryName(exeFile);
+            var arg = $"\"8394\" \"LoLLauncher.exe\" \"\" {GetSpectatorArgument(game)}";
+            Process.Start(exeFile, arg).WaitForExit();
         }
 
         [Error]

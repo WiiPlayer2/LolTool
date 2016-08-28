@@ -35,6 +35,14 @@ namespace LoLTool
                     }
                     Thread.Sleep(1000 * checkRate);
                 }
+                catch (NullReferenceException)
+                {
+                    Thread.Sleep(2000 * checkRate);
+                }
+                catch (Exception e)
+                {
+                    throw;
+                }
             }
             return default(T);
         }
