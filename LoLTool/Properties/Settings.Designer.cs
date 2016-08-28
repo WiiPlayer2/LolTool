@@ -46,5 +46,17 @@ namespace LoLTool.Properties {
                 this["Region"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("C:\\Riot Games")]
+        public string LolDirectory {
+            get {
+                return ((string)(this["LolDirectory"]));
+            }
+            set {
+                this["LolDirectory"] = value;
+            }
+        }
     }
 }

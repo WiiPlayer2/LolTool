@@ -69,6 +69,7 @@ namespace LoLTool
             }
         }
 
+        #region Global Parameters
         [Global(Description = "Sets and saves the Riot Development Key")]
         public static void SetApiKey(string key)
         {
@@ -82,6 +83,14 @@ namespace LoLTool
             Settings.Default.Region = region;
             Settings.Default.Save();
         }
+
+        [Global(Description = "Sets the parent directory of League of Legends (by default \"C:\\Riot Games\")")]
+        public static void SetLoLDir(string lolDirectory)
+        {
+            Settings.Default.LolDirectory = lolDirectory;
+            Settings.Default.Save();
+        }
+        #endregion
 
         private static Platform Platform
         {
@@ -97,6 +106,7 @@ namespace LoLTool
             }
         }
 
+        #region Verbs
         [Verb(Description = "Waits until the given summoner has finished its game and afterwards plays a sound notification")]
         public static void Chime(
             [Description("The summoner of which the game should be waited for")]
@@ -252,27 +262,10 @@ namespace LoLTool
             }
         }
 
-        private static string GetSpectatorArgument(RiotSharp.CurrentGameEndpoint.CurrentGame game)
-        {
-            var endpoint = "";
-            switch (Settings.Default.Region)
-            {
-                case Region.euw:
-                    endpoint = "spectator.euw1.lol.riotgames.com:80";
-                    break;
-                default:
-                    throw new NotImplementedException();
-            }
-
-            return $"\"spectator {endpoint} {game.Observers.EncryptionKey} {game.GameId} {Platform}\"";
-        }
-
         [Verb(Description = "Spectates the given summoner")]
         public static void Spectate(
             [Description("The summoner of which the game should be spectated")]
-            string username,
-            [DefaultValue(@"C:\Riot Games")]
-            string lolDirectory)
+            string username)
         {
             var summoner = Api.TryGetSummoner(Settings.Default.Region, username);
             if (summoner == null)
@@ -288,10 +281,10 @@ namespace LoLTool
                 return;
             }
 
-            var folder = Path.Combine(lolDirectory, "League of Legends", "RADS", "solutions", "lol_game_client_sln", "releases");
+            var folder = Path.Combine(Settings.Default.LolDirectory, "League of Legends", "RADS", "solutions", "lol_game_client_sln", "releases");
             if (!Directory.Exists(folder))
             {
-                Console.WriteLine("League of Legends not found at \"{0}\"", lolDirectory);
+                Console.WriteLine("League of Legends not found at \"{0}\"", Settings.Default.LolDirectory);
                 return;
             }
 
@@ -307,11 +300,29 @@ namespace LoLTool
             var arg = $"\"8394\" \"LoLLauncher.exe\" \"\" {GetSpectatorArgument(game)}";
             Process.Start(exeFile, arg).WaitForExit();
         }
+        #endregion
 
         [Error]
         public static void HandleError(ExceptionContext context)
         {
             Console.WriteLine(context.Exception);
         }
+
+        #region Helper
+        private static string GetSpectatorArgument(RiotSharp.CurrentGameEndpoint.CurrentGame game)
+        {
+            var endpoint = "";
+            switch (Settings.Default.Region)
+            {
+                case Region.euw:
+                    endpoint = "spectator.euw1.lol.riotgames.com:80";
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+
+            return $"\"spectator {endpoint} {game.Observers.EncryptionKey} {game.GameId} {Platform}\"";
+        }
+        #endregion
     }
 }
